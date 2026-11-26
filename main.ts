@@ -9,7 +9,22 @@
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
-copyFileSync(new URL('./entry.jpg', import.meta.url), join(process.env.MAKEFUN_OUTPUT_DIR ?? '/output', 'entry.png'));
+const source = new URL('./entry.jpg', import.meta.url);
+const output = join(process.env.MAKEFUN_OUTPUT_DIR ?? '/output', 'entry.png');
+
+copyFileSync(source, output);
+
+// Verify the copy landed intact: read the output back and compare its SHA-256
+// against the source, so a truncated or corrupted write fails loudly instead
+// of silently handing the judge a damaged image.
+const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+const sourceHash = sha256(readFileSync(source));
+const outputHash = sha256(readFileSync(output));
+if (sourceHash !== outputHash) {
+  console.error(`error: entry.png failed integrity check (source sha256 ${sourceHash}, output sha256 ${outputHash})`);
+  process.exit(1);
+}
